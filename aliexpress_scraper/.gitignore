@@ -14,16 +14,75 @@ dist/
 .venv/
 venv/
 
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# React/Vite build outputs
+dist/
+.vite/
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Scraping data and outputs
+scrapes/
+*.csv
+*.json
+debug_*.html
+debug_*.js
+debug_*.json
+*.debug.log
+
+# Public data files (generated)
+public/data/
+
+# Test coverage
+coverage/
+.coverage
+htmlcov/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
 # Editors
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # Logs
 logs/
 *.log
 
-# Playwright cache
+# Playwright cache and results
 playwright/.cache/
+test-results/
+playwright-report/
 
-# OS
+# OS files
 .DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Package manager lock files (keep only one)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Backup files
+*.bak
+*.backup
+*_original.*
