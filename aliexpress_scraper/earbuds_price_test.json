@@ -1,0 +1,54 @@
+{
+  "query": "wireless earbuds",
+  "scrape_time": "2025-08-31T14:25:41+10:00",
+  "suppliers": [
+    {
+      "seller_name": "Google Play",
+      "seller_url": "https://play.google.com/store/apps/details?id=com.alibaba.aliexpresshd",
+      "seller_rating": null,
+      "num_followers": null,
+      "store_location": null,
+      "seller_badges": [],
+      "years_on_platform": null,
+      "total_reviews": null,
+      "products": [
+        {
+          "product_title": "Realfit F2 Bluetooth Earphone Excellent HIFI Quality TWS Wireless Earbuds Wholesale for realme xiaomi",
+          "product_url": "https://www.aliexpress.com/item/1005007345085303.html",
+          "product_id": "1005007345085303",
+          "price": "AU $10.39",
+          "currency": "AUD",
+          "original_price": null,
+          "discount_percent": null,
+          "rating": null,
+          "num_ratings": 4166,
+          "num_orders": 10000,
+          "available_skus": [],
+          "stock_availability": null,
+          "image_urls": [
+            "https://ae-pic-a1.aliexpress-media.com/kf/S68a10ae18a7e4f5a8d0556bf7cfefd5fp.jpg_220x220q75.jpg_.avif",
+            "https://ae-pic-a1.aliexpress-media.com/kf/S5b6dde4aacf84756a4716e68a618b905m.jpg_220x220q75.jpg_.avif",
+            "https://ae-pic-a1.aliexpress-media.com/kf/Sfb41918170d942c1a0c5ac0b25e4ba64S.jpg_220x220q75.jpg_.avif",
+            "https://ae-pic-a1.aliexpress-media.com/kf/Sb851b1fa98784822b1150a8e45c8c501S.jpg_220x220q75.jpg_.avif",
+            "https://ae-pic-a1.aliexpress-media.com/kf/S98148ca97d7849d1acabd22b0c4a3a2dN.jpg_220x220q75.jpg_.avif"
+          ],
+          "shipping_options": [
+            {
+              "info": "free shipping"
+            },
+            {
+              "info": "refund if no delivery in 30 days"
+            },
+            {
+              "info": "free returns within 90 days"
+            }
+          ],
+          "estimated_delivery": null,
+          "return_policy": null,
+          "warranty": null,
+          "last_scraped": "2025-08-31T14:25:39+10:00"
+        }
+      ]
+    }
+  ]
+}
