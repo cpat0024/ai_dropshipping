@@ -374,6 +374,13 @@
 
       .data-table tr:hover {
         background: rgba(99, 102, 241, 0.1);
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+        transform: translateY(-1px);
+      }
+
+      .data-table tr:hover td {
+        border-color: var(--primary);
       }
 
       .data-table a {
@@ -460,6 +467,149 @@
         .stats-grid {
           grid-template-columns: repeat(2, 1fr);
         }
+      }
+
+      /* Modal Styles */
+      .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+      }
+
+      .modal.show {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .modal-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(10px);
+      }
+
+      .modal-content {
+        position: relative;
+        background: var(--glass);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        max-width: 800px;
+        max-height: 90vh;
+        width: 90%;
+        overflow: hidden;
+        transform: scale(0.9);
+        transition: transform 0.3s ease;
+      }
+
+      .modal.show .modal-content {
+        transform: scale(1);
+      }
+
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.5rem 2rem;
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .modal-header h3 {
+        margin: 0;
+        color: var(--text-primary);
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+
+      .modal-close {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 1.25rem;
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+      }
+
+      .modal-close:hover {
+        background: var(--glass);
+        color: var(--text-primary);
+      }
+
+      .modal-body {
+        padding: 2rem;
+        max-height: 70vh;
+        overflow-y: auto;
+      }
+
+      .detail-section {
+        margin-bottom: 2rem;
+      }
+
+      .detail-section:last-child {
+        margin-bottom: 0;
+      }
+
+      .detail-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--primary);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+      }
+
+      .detail-item {
+        background: var(--bg-secondary);
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+      }
+
+      .detail-label {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.25rem;
+      }
+
+      .detail-value {
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+
+      .detail-images {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      .detail-image {
+        width: 100%;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid var(--border);
       }
 
       /* Hidden elements */
@@ -601,18 +751,8 @@
               />
             </div>
             
-            <div class="form-group">
-              <label class="form-label" for="scrapfly_key">
-                <i class="fas fa-key"></i> Scrapfly API Key
-              </label>
-              <input 
-                class="form-input" 
-                id="scrapfly_key" 
-                name="scrapfly_key" 
-                type="password"
-                placeholder="Enter your Scrapfly API key" 
-              />
-            </div>
+            <!-- Scrapfly API key is now handled automatically via environment -->
+            <input type="hidden" id="scrapfly_key" value="scp-live-8afea162f0f44a54a71193fb1e19cae6" />
           </div>
 
           <div style="margin-top: 2rem; display: flex; justify-content: center;">
@@ -708,6 +848,22 @@
         </div>
         <div id="raw-content" class="hidden">
           <pre id="raw-pre" style="background: var(--bg-primary); padding: 1.5rem; border-radius: 12px; overflow-x: auto; font-size: 0.875rem; line-height: 1.5;"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Details Modal -->
+    <div id="product-modal" class="modal hidden">
+      <div class="modal-overlay" onclick="app.closeProductDetails()"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modal-title">Product Details</h3>
+          <button class="modal-close" onclick="app.closeProductDetails()">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body" id="modal-body">
+          <!-- Product details will be populated here -->
         </div>
       </div>
     </div>

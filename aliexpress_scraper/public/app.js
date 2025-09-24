@@ -5,6 +5,8 @@ class SupplierAnalyzer {
     this.initializeEventListeners();
     this.performanceChart = null;
     this.isAnalyzing = false;
+    this.currentProducts = []; // Store current products for modal access
+    this.preservedUrls = {}; // Store URLs by product title for later use
   }
 
   initializeElements() {
@@ -34,13 +36,11 @@ class SupplierAnalyzer {
     
     // Add input validation
     document.getElementById('query').addEventListener('input', this.validateForm.bind(this));
-    document.getElementById('scrapfly_key').addEventListener('input', this.validateForm.bind(this));
   }
 
   validateForm() {
     const query = document.getElementById('query').value.trim();
-    const apiKey = document.getElementById('scrapfly_key').value.trim();
-    const isValid = query.length > 0 && apiKey.length > 0;
+    const isValid = query.length > 0;
     
     this.runBtn.disabled = !isValid || this.isAnalyzing;
     return isValid;
@@ -268,6 +268,9 @@ class SupplierAnalyzer {
   }
 
   renderProductRankings(products) {
+    // Store products for modal access
+    this.currentProducts = products;
+    
     // Debug: Check if URLs are present in the data
     console.log('Product data received:', products.slice(0, 2));
     
@@ -286,7 +289,7 @@ class SupplierAnalyzer {
       }
       
       return `
-        <tr class="fade-in" style="animation-delay: ${index * 0.05}s">
+        <tr class="fade-in" style="animation-delay: ${index * 0.05}s; cursor: pointer;" onclick="app.showProductDetails(${index})" title="Click for detailed information">
           <td>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
               <span style="font-weight: 600; color: var(--accent);">#${index + 1}</span>
@@ -294,14 +297,21 @@ class SupplierAnalyzer {
             </div>
           </td>
           <td>
-            ${hasValidUrl ? 
-              `<a href="${productUrl}" target="_blank" rel="noopener">
-                ${this.truncateText(product.product_title || 'Unknown Product', 50)}
-              </a>` :
-              `<span title="URL not available">
-                ${this.truncateText(product.product_title || 'Unknown Product', 50)}
-              </span>`
-            }
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                ${hasValidUrl ? 
+                  `<a href="${productUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">
+                    ${this.truncateText(product.product_title || 'Unknown Product', 50)}
+                  </a>` :
+                  `<span title="URL not available">
+                    ${this.truncateText(product.product_title || 'Unknown Product', 50)}
+                  </span>`
+                }
+              </div>
+              <button style="background: var(--primary); color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer;" onclick="event.stopPropagation(); app.showProductDetails(${index})">
+                <i class="fas fa-info-circle"></i> Details
+              </button>
+            </div>
           </td>
           <td>
             <div style="font-weight: 500;">${product.seller_name || 'Unknown'}</div>
@@ -487,6 +497,169 @@ class SupplierAnalyzer {
     if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
     return num.toString();
   }
+
+  showProductDetails(productIndex) {
+    const product = this.currentProducts[productIndex];
+    if (!product) return;
+
+    const modal = document.getElementById('product-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+
+    modalTitle.textContent = product.product_title || 'Product Details';
+
+    // Create detailed product information
+    const detailsHTML = `
+      <div class="detail-section">
+        <div class="detail-title">
+          <i class="fas fa-info-circle"></i>
+          Basic Information
+        </div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <div class="detail-label">Product Title</div>
+            <div class="detail-value">${product.product_title || 'N/A'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Price</div>
+            <div class="detail-value" style="color: var(--success); font-weight: 600;">${product.price || product.price_original || 'N/A'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Original Price</div>
+            <div class="detail-value">${product.original_price || product.price_original || 'N/A'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Currency</div>
+            <div class="detail-value">${product.currency || 'USD'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-title">
+          <i class="fas fa-star"></i>
+          Reviews & Rating
+        </div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <div class="detail-label">Rating</div>
+            <div class="detail-value">
+              ${this.renderStars(product.rating || 0)}
+              <span>(${product.rating || 0}/5)</span>
+            </div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Number of Reviews</div>
+            <div class="detail-value">${this.formatNumber(product.num_ratings || product.rating_count || 0)}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Total Orders</div>
+            <div class="detail-value">${this.formatNumber(product.num_orders || 0)}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">AI Score</div>
+            <div class="detail-value" style="color: var(--primary); font-weight: 600;">${product.ai_score || this.calculateAIScore(product)}%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-title">
+          <i class="fas fa-store"></i>
+          Supplier Information
+        </div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <div class="detail-label">Seller Name</div>
+            <div class="detail-value">${product.seller_name || 'Unknown Seller'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Store Rating</div>
+            <div class="detail-value">${product.store_rating || 'N/A'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Years in Business</div>
+            <div class="detail-value">${product.years_in_business || 'N/A'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Response Rate</div>
+            <div class="detail-value">${product.response_rate || 'N/A'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-title">
+          <i class="fas fa-shipping-fast"></i>
+          Shipping & Logistics
+        </div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <div class="detail-label">Estimated Delivery</div>
+            <div class="detail-value">${product.estimated_delivery || product.delivery_time || 'N/A'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Shipping Cost</div>
+            <div class="detail-value">${product.shipping_cost || 'N/A'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Free Shipping</div>
+            <div class="detail-value">${product.free_shipping ? 'Yes' : 'No'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Return Policy</div>
+            <div class="detail-value">${product.return_policy || 'Standard Return Policy'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-title">
+          <i class="fas fa-link"></i>
+          Product Links
+        </div>
+        <div class="detail-grid">
+          <div class="detail-item" style="grid-column: 1 / -1;">
+            <div class="detail-label">Product URL</div>
+            <div class="detail-value">
+              ${product.product_url ? 
+                `<a href="${product.product_url}" target="_blank" rel="noopener" style="color: var(--primary); text-decoration: underline;">
+                  View on AliExpress <i class="fas fa-external-link-alt"></i>
+                </a>` : 
+                'URL not available'
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      ${product.images && product.images.length > 0 ? `
+      <div class="detail-section">
+        <div class="detail-title">
+          <i class="fas fa-images"></i>
+          Product Images
+        </div>
+        <div class="detail-images">
+          ${product.images.slice(0, 6).map(img => `
+            <img src="${img}" alt="Product image" class="detail-image" onerror="this.style.display='none'">
+          `).join('')}
+        </div>
+      </div>
+      ` : ''}
+    `;
+
+    modalBody.innerHTML = detailsHTML;
+    modal.classList.remove('hidden');
+    modal.classList.add('show');
+  }
+
+  closeProductDetails() {
+    const modal = document.getElementById('product-modal');
+    modal.classList.remove('show');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+    }, 300);
+  }
 }
 
 // Toggle raw data visibility
@@ -508,7 +681,7 @@ function toggleRawData() {
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
-  new SupplierAnalyzer();
+  window.app = new SupplierAnalyzer();
   
   // Add some nice touches
   console.log(`
