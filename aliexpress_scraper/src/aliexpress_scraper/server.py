@@ -26,11 +26,14 @@ from typing import Any, Dict, Optional, Tuple
 try:  # graceful import for explicit Scrapfly error handling
     from scrapfly.errors import ApiHttpClientError as ScrapflyHttpError  # type: ignore
 except Exception:  # pragma: no cover
+
     class ScrapflyHttpError(Exception):
         pass
 
+
 try:
     from dotenv import load_dotenv  # type: ignore
+
     _HAS_DOTENV = True
 except ImportError:  # pragma: no cover - optional
     _HAS_DOTENV = False
@@ -130,21 +133,21 @@ class CleanerAgent:
                 LOGGER.warning("google-generativeai not available: %s", e)
                 self._client = None
 
-    async def clean(self, result: ScrapeResult, csv_path: Optional[Path]) -> Dict[str, Any]:
+    async def clean(
+        self, result: ScrapeResult, csv_path: Optional[Path]
+    ) -> Dict[str, Any]:
         """Return a cleaned summary dict. CSV is optional; if provided it's deleted here."""
         try:
             if self._client:
                 prompt = (
                     "You are an AI-powered dropshipping supplier evaluation expert. Analyze the provided "
                     "AliExpress scraping results and generate intelligent insights for supplier selection. "
-                    
                     "Your analysis should focus on these key dropshipping metrics: "
                     "1. Product pricing competitiveness "
                     "2. Shipping performance and reliability "
                     "3. Customer satisfaction (reviews, ratings) "
                     "4. Supplier credibility and trustworthiness "
                     "5. Return policies and customer service "
-                    
                     "CRITICAL: Generate a comprehensive JSON response with: "
                     "- 'top_products': Array of up to 10 best products ranked by AI scoring algorithm. "
                     "  IMPORTANT: Each product MUST include ALL original fields: product_title, product_url, product_id, seller_name, price, currency, rating, num_ratings, num_orders, and add ai_score (0-100). "
@@ -153,43 +156,45 @@ class CleanerAgent:
                     "- 'market_analysis': Object with competitive landscape, pricing trends, and demand indicators "
                     "- 'recommendations': Array of specific recommendations for dropshipping success "
                     "- 'risk_factors': Array of potential risks and mitigation strategies "
-                    
                     "PRESERVE ALL URLs: Keep all product_url and seller_url fields exactly as provided in the input data. "
                     "Apply advanced sentiment analysis to reviews and provide confidence scores. "
                     "Consider seasonal trends, shipping costs, and profit margins in your analysis. "
                     "Respond with valid JSON only, no markdown formatting."
                 )
                 # Send JSON as plain text content, not as structured data
-                payload_text = json.dumps({
-                    "query": result.query,
-                    "suppliers": [
-                        {
-                            "seller_name": s.seller_name,
-                            "seller_url": s.seller_url,
-                            "seller_rating": s.seller_rating,
-                            "num_followers": s.num_followers,
-                            "store_location": s.store_location,
-                            "products": [
-                                {
-                                    "product_title": p.product_title,
-                                    "product_url": p.product_url,
-                                    "product_id": p.product_id,
-                                    "price": p.price,
-                                    "currency": p.currency,
-                                    "rating": p.rating,
-                                    "num_ratings": p.num_ratings,
-                                    "num_orders": p.num_orders,
-                                }
-                                for p in s.products
-                            ],
-                        }
-                        for s in result.suppliers
-                    ],
-                }, indent=2)
+                payload_text = json.dumps(
+                    {
+                        "query": result.query,
+                        "suppliers": [
+                            {
+                                "seller_name": s.seller_name,
+                                "seller_url": s.seller_url,
+                                "seller_rating": s.seller_rating,
+                                "num_followers": s.num_followers,
+                                "store_location": s.store_location,
+                                "products": [
+                                    {
+                                        "product_title": p.product_title,
+                                        "product_url": p.product_url,
+                                        "product_id": p.product_id,
+                                        "price": p.price,
+                                        "currency": p.currency,
+                                        "rating": p.rating,
+                                        "num_ratings": p.num_ratings,
+                                        "num_orders": p.num_orders,
+                                    }
+                                    for p in s.products
+                                ],
+                            }
+                            for s in result.suppliers
+                        ],
+                    },
+                    indent=2,
+                )
 
                 # Create content as simple text
                 content_parts = [prompt, "\n\nAliExpress Data:\n", payload_text]
-                
+
                 if csv_path and csv_path.exists():
                     try:
                         csv_content = csv_path.read_text(encoding="utf-8")
@@ -200,23 +205,27 @@ class CleanerAgent:
 
                 # Send as single text content
                 full_content = "".join(content_parts)
-                resp = await asyncio.to_thread(self._client.generate_content, full_content)  # type: ignore[union-attr]
+                resp = await asyncio.to_thread(
+                    self._client.generate_content, full_content
+                )  # type: ignore[union-attr]
                 text = resp.text if hasattr(resp, "text") else str(resp)
                 cleaned = self.extract_json(text)
             else:
                 cleaned = self._local_fallback_clean(result)
-            
+
             # Safety check: Ensure URLs are preserved in cleaned results
             if cleaned and "top_products" in cleaned:
                 self._ensure_urls_preserved(cleaned["top_products"], result)
-            
+
             return cleaned
         finally:
             # Always delete temp CSV if present
             if csv_path and csv_path.exists():
                 delete_file_safe(csv_path)
 
-    def _ensure_urls_preserved(self, ai_products: list, original_result: ScrapeResult) -> None:
+    def _ensure_urls_preserved(
+        self, ai_products: list, original_result: ScrapeResult
+    ) -> None:
         """Ensure URLs are preserved in AI-processed products by matching with original data."""
         # Create a lookup of original products by title
         original_products = {}
@@ -226,17 +235,24 @@ class CleanerAgent:
                     original_products[product.product_title.lower().strip()] = {
                         "product_url": product.product_url,
                         "product_id": product.product_id,
-                        "seller_url": supplier.seller_url
+                        "seller_url": supplier.seller_url,
                     }
-        
+
         # Fill in missing URLs in AI products
         for ai_product in ai_products:
-            if not ai_product.get("product_url") or ai_product.get("product_url") == "#":
+            if (
+                not ai_product.get("product_url")
+                or ai_product.get("product_url") == "#"
+            ):
                 title_key = (ai_product.get("product_title") or "").lower().strip()
                 if title_key in original_products:
-                    ai_product["product_url"] = original_products[title_key]["product_url"]
+                    ai_product["product_url"] = original_products[title_key][
+                        "product_url"
+                    ]
                     if not ai_product.get("product_id"):
-                        ai_product["product_id"] = original_products[title_key]["product_id"]
+                        ai_product["product_id"] = original_products[title_key][
+                            "product_id"
+                        ]
 
     @staticmethod
     def extract_json(text: str) -> Dict[str, Any]:
@@ -267,7 +283,7 @@ class CleanerAgent:
         total_orders = 0
         total_ratings = 0
         rating_count = 0
-        
+
         for s in result.suppliers:
             for p in s.products:
                 orders = p.num_orders or 0
@@ -276,7 +292,7 @@ class CleanerAgent:
                 if rating > 0:
                     total_ratings += rating
                     rating_count += 1
-                    
+
                 products.append(
                     {
                         "product_title": p.product_title,
@@ -285,39 +301,62 @@ class CleanerAgent:
                         "price": p.price,
                         "rating": rating,
                         "num_orders": orders,
-                        "ai_score": min(100, int((rating / 5 * 50) + (min(orders / 1000, 1) * 50))),
+                        "ai_score": min(
+                            100, int((rating / 5 * 50) + (min(orders / 1000, 1) * 50))
+                        ),
                     }
                 )
-                
+
         # Sort by AI score (rating + order volume)
-        products.sort(key=lambda x: (x.get("ai_score", 0), x.get("rating", 0), x.get("num_orders", 0)), reverse=True)
+        products.sort(
+            key=lambda x: (
+                x.get("ai_score", 0),
+                x.get("rating", 0),
+                x.get("num_orders", 0),
+            ),
+            reverse=True,
+        )
         top_products = products[:10]
-        
+
         # Analyze suppliers
         supplier_scores = []
         for s in result.suppliers:
-            avg_product_rating = sum(p.rating or 0 for p in s.products) / len(s.products) if s.products else 0
+            avg_product_rating = (
+                sum(p.rating or 0 for p in s.products) / len(s.products)
+                if s.products
+                else 0
+            )
             total_product_orders = sum(p.num_orders or 0 for p in s.products)
-            
-            supplier_scores.append({
-                "seller_name": s.seller_name,
-                "seller_url": s.seller_url,
-                "seller_rating": s.seller_rating,
-                "num_products": len(s.products),
-                "avg_product_rating": round(avg_product_rating, 2),
-                "total_orders": total_product_orders,
-                "store_location": s.store_location,
-                "reliability_score": min(100, int((s.seller_rating or 0) / 5 * 60 + avg_product_rating / 5 * 40))
-            })
-            
+
+            supplier_scores.append(
+                {
+                    "seller_name": s.seller_name,
+                    "seller_url": s.seller_url,
+                    "seller_rating": s.seller_rating,
+                    "num_products": len(s.products),
+                    "avg_product_rating": round(avg_product_rating, 2),
+                    "total_orders": total_product_orders,
+                    "store_location": s.store_location,
+                    "reliability_score": min(
+                        100,
+                        int(
+                            (s.seller_rating or 0) / 5 * 60
+                            + avg_product_rating / 5 * 40
+                        ),
+                    ),
+                }
+            )
+
         supplier_scores.sort(key=lambda x: x.get("reliability_score", 0), reverse=True)
         top_sellers = supplier_scores[:5]
-        
+
         # Generate intelligent insights
         avg_rating = total_ratings / rating_count if rating_count > 0 else 0
         high_rated_products = len([p for p in products if (p.get("rating", 0) >= 4.5)])
-        high_volume_products = len([p for p in products if (p.get("num_orders", 0) >= 1000)])
-        
+        high_volume_products = len(
+            [p for p in products if (p.get("num_orders", 0) >= 1000)]
+        )
+
         insights = [
             f"Analyzed {len(result.suppliers)} suppliers with {len(products)} total products",
             f"Average product rating: {avg_rating:.1f}/5.0 ({rating_count} rated products)",
@@ -325,48 +364,62 @@ class CleanerAgent:
             f"Identified {high_volume_products} high-volume products (1000+ orders) - proven market demand",
             f"Total market orders: {total_orders:,} across all products analyzed",
         ]
-        
+
         if avg_rating >= 4.0:
-            insights.append("⭐ Market shows strong quality indicators - good for brand reputation")
+            insights.append(
+                "⭐ Market shows strong quality indicators - good for brand reputation"
+            )
         if high_volume_products >= 3:
-            insights.append("📈 Multiple proven bestsellers found - reduced market risk")
+            insights.append(
+                "📈 Multiple proven bestsellers found - reduced market risk"
+            )
         if len(result.suppliers) >= 3:
-            insights.append("🏪 Diverse supplier base available - good for supply chain resilience")
-            
+            insights.append(
+                "🏪 Diverse supplier base available - good for supply chain resilience"
+            )
+
         # Market analysis
-        price_ranges = [float(p.get("price", "0").replace("$", "").replace(",", "")) for p in products if p.get("price")]
+        price_ranges = [
+            float(p.get("price", "0").replace("$", "").replace(",", ""))
+            for p in products
+            if p.get("price")
+        ]
         avg_price = sum(price_ranges) / len(price_ranges) if price_ranges else 0
-        
+
         market_analysis = {
             "total_suppliers": len(result.suppliers),
             "total_products": len(products),
             "avg_rating": round(avg_rating, 2),
             "avg_price": round(avg_price, 2),
-            "high_quality_ratio": round(high_rated_products / len(products) * 100, 1) if products else 0,
-            "proven_demand_ratio": round(high_volume_products / len(products) * 100, 1) if products else 0
+            "high_quality_ratio": round(high_rated_products / len(products) * 100, 1)
+            if products
+            else 0,
+            "proven_demand_ratio": round(high_volume_products / len(products) * 100, 1)
+            if products
+            else 0,
         }
-        
+
         recommendations = [
             "Focus on suppliers with 4.5+ ratings and 1000+ orders for reliable dropshipping",
             "Consider bulk ordering from top-rated suppliers to negotiate better prices",
             "Monitor seasonal trends and adjust inventory based on order volume patterns",
-            "Establish relationships with multiple suppliers to ensure consistent stock availability"
+            "Establish relationships with multiple suppliers to ensure consistent stock availability",
         ]
-        
+
         risk_factors = [
             "Verify supplier shipping times and costs for your target markets",
             "Check return policies and customer service responsiveness",
             "Monitor product quality through sample orders before bulk purchasing",
-            "Consider currency fluctuations when planning profit margins"
+            "Consider currency fluctuations when planning profit margins",
         ]
-        
+
         return {
             "top_products": top_products,
-            "top_sellers": top_sellers, 
+            "top_sellers": top_sellers,
             "insights": insights,
             "market_analysis": market_analysis,
             "recommendations": recommendations,
-            "risk_factors": risk_factors
+            "risk_factors": risk_factors,
         }
 
 
@@ -397,10 +450,10 @@ class OrchestratorAgent:
             "return a compact JSON with the same keys but with values clamped to safe ranges. "
             "Keys: max_suppliers (1..10), max_products_per_seller (1..10), limit (1..50), country (2 letters)."
         )
-        
+
         # Send as plain text instead of structured content
         content = f"{prompt}\n\nRequest: {json.dumps({'query': query, **params})}"
-        
+
         try:
             resp = await asyncio.to_thread(self._client.generate_content, content)  # type: ignore[union-attr]
             text = resp.text if hasattr(resp, "text") else str(resp)
@@ -412,7 +465,9 @@ class OrchestratorAgent:
                     out[k] = cleaned[k]
             # Clamp
             out["max_suppliers"] = max(1, min(10, int(out.get("max_suppliers", 5))))
-            out["max_products_per_seller"] = max(1, min(10, int(out.get("max_products_per_seller", 1))))
+            out["max_products_per_seller"] = max(
+                1, min(10, int(out.get("max_products_per_seller", 1)))
+            )
             out["limit"] = max(1, min(50, int(out.get("limit", 20))))
             c = str(out.get("country", "AU")).upper()
             out["country"] = c[:2] if len(c) >= 2 else "AU"
@@ -440,7 +495,7 @@ class Handler(BaseHTTPRequestHandler):
         rel_path = self.path.split("?", 1)[0]
         if rel_path == "/":
             rel_path = "/index.html"
-        file_path = (PUBLIC_DIR / rel_path.lstrip("/"))
+        file_path = PUBLIC_DIR / rel_path.lstrip("/")
         if file_path.is_dir():
             file_path = file_path / "index.html"
         if not file_path.exists():
@@ -522,7 +577,9 @@ class Handler(BaseHTTPRequestHandler):
             result = await run_with_scrapfly(
                 query,
                 max_suppliers=int(planned.get("max_suppliers", max_suppliers)),
-                max_products_per_seller=int(planned.get("max_products_per_seller", max_products_per_seller)),
+                max_products_per_seller=int(
+                    planned.get("max_products_per_seller", max_products_per_seller)
+                ),
                 limit=int(planned.get("limit", limit)),
                 country=str(planned.get("country", country)),
                 key=scrapfly_key,
