@@ -25,6 +25,8 @@ dependencies = [
   "scrapfly-sdk>=0.8,<1.0",
   "parsel>=1.9,<2.0",
   "requests>=2.31,<3.0",
+  "google-generativeai>=0.8.0",
+  "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +41,7 @@ dev = [
 
 [project.scripts]
 aliexpress-scraper = "aliexpress_scraper.cli:main"
+aliexpress-web = "aliexpress_scraper.web:run"
 
 [tool.setuptools.packages.find]
 where = ["src"]

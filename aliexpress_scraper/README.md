@@ -1,6 +1,12 @@
-# AliExpress Scraper (Scrapfly)
+# AliExpress Scraper (Frontend + Built-in Server)
 
-Robust, modular AliExpress scraper with a CLI and programmatic API using Scrapfly under the hood.
+Robust, modular AliExpress scraper with a minimal frontend and built-in Python HTTP server (no FastAPI). The legacy CLI remains available.
+
+Data flow:
+- Optional OrchestratorAgent (Gemini) validates parameters
+- Scrapfly scraper collects sellers and products
+- CleanerAgent (Gemini) summarizes and normalizes output
+- A temporary CSV is created and deleted immediately after AI processing (no stale CSVs)
 
 Ethics and caveats: Scraping may be fragile and region- or session-dependent. Respect site terms and laws. Do not bypass CAPTCHAs or other access controls. Enable `--respect-robots` to check robots.txt and exit if disallowed. Expect occasional failures due to anti-bot systems; mitigate with slower rates, proxies, headful mode, and human-in-the-loop when needed.
 
@@ -58,9 +64,29 @@ Or runtime only:
 pip install -e .
 ```
 
-## Quick start
+## Frontend quick start
 
-CLI:
+1) Set environment variables (or fill fields in the UI):
+
+```bash
+export SCRAPFLY_KEY=YOUR_SCRAPFLY_KEY
+# optional for agents
+export GOOGLE_API_KEY=YOUR_GOOGLE_KEY
+# optional cookie for localization
+export AEP_USUC_F="aep_usuc_f=..."
+```
+
+2) Run the server:
+
+```bash
+aliexpress-web
+```
+
+3) Open http://127.0.0.1:8787
+
+## CLI quick start (still available)
+
+CLI remains for direct runs:
 
 ```bash
 export SCRAPFLY_KEY=YOUR_KEY

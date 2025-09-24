@@ -1,10 +1,11 @@
-from __future__ import annotations
-
 """Module entrypoint for `python -m aliexpress_scraper`.
 
-Just forwards to CLI main.
+Now forwards to the built-in web server. For CLI, use `aliexpress-scraper`.
 """
-from .cli import main
+
+from __future__ import annotations
+
+from .web import run as main
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

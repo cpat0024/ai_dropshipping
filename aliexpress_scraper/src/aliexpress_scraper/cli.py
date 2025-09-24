@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
+
 from .config import Config
 from .logger import add_file_handler, get_logger
 from .scrapfly_adapter import run_with_scrapfly
@@ -22,13 +24,25 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=20)
     p.add_argument("--debug", action="store_true")
     # Scrapfly options
-    p.add_argument("--scrapfly-key", type=str, help="Scrapfly API key (or set SCRAPFLY_KEY env)")
-    p.add_argument("--country", type=str, default="AU", help="Country code for localization with Scrapfly")
-    p.add_argument("--aep-cookie", type=str, help="Optional aep_usuc_f cookie for localization")
+    p.add_argument(
+        "--scrapfly-key", type=str, help="Scrapfly API key (or set SCRAPFLY_KEY env)"
+    )
+    p.add_argument(
+        "--country",
+        type=str,
+        default="AU",
+        help="Country code for localization with Scrapfly",
+    )
+    p.add_argument(
+        "--aep-cookie", type=str, help="Optional aep_usuc_f cookie for localization"
+    )
     return p
 
 
 def main(argv: Optional[list[str]] = None) -> int:
+    # Load environment variables from .env file
+    load_dotenv()
+
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -49,7 +63,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     async def runner() -> int:
         key = args.scrapfly_key or os.environ.get("SCRAPFLY_KEY")
         if not key:
-            print("Scrapfly API key required: pass --scrapfly-key or set SCRAPFLY_KEY env")
+            print(
+                "Scrapfly API key required: pass --scrapfly-key or set SCRAPFLY_KEY env"
+            )
             return 2
         result = await run_with_scrapfly(
             args.query,

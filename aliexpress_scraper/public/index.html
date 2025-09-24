@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Supplier Evaluation System - Dropshipping Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      :root {
+        --primary: #6366f1;
+        --primary-dark: #4f46e5;
+        --secondary: #14b8a6;
+        --accent: #f59e0b;
+        --danger: #ef4444;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --bg-primary: #0f0f23;
+        --bg-secondary: #1a1a3e;
+        --bg-tertiary: #242448;
+        --text-primary: #f8fafc;
+        --text-secondary: #cbd5e1;
+        --text-muted: #64748b;
+        --border: #334155;
+        --border-light: #475569;
+        --glass: rgba(255, 255, 255, 0.05);
+        --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+        color: var(--text-primary);
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* Animated Background */
+      .bg-animation {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      .floating-orb {
+        position: absolute;
+        background: linear-gradient(45deg, var(--primary), var(--secondary));
+        border-radius: 50%;
+        opacity: 0.1;
+        animation: float 6s ease-in-out infinite;
+      }
+
+      .orb-1 { width: 300px; height: 300px; top: 10%; left: 10%; animation-delay: 0s; }
+      .orb-2 { width: 200px; height: 200px; top: 60%; right: 10%; animation-delay: 2s; }
+      .orb-3 { width: 150px; height: 150px; bottom: 20%; left: 30%; animation-delay: 4s; }
+
+      @keyframes float {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(180deg); }
+      }
+
+      /* Header */
+      .header {
+        background: rgba(15, 15, 35, 0.8);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--border);
+        padding: 1rem 2rem;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+
+      .header-content {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary);
+      }
+
+      .logo i {
+        font-size: 2rem;
+        background: linear-gradient(45deg, var(--primary), var(--secondary));
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: var(--glass);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        font-size: 0.875rem;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--success);
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      /* Main Content */
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem;
+        display: grid;
+        gap: 2rem;
+      }
+
+      .glass-card {
+        background: rgba(26, 26, 62, 0.6);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 2rem;
+        box-shadow: var(--shadow);
+        transition: all 0.3s ease;
+      }
+
+      .glass-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--primary);
+        box-shadow: 0 25px 50px -12px rgba(99, 102, 241, 0.25);
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .card-icon {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+      }
+
+      .primary-icon { background: linear-gradient(45deg, var(--primary), var(--primary-dark)); }
+      .secondary-icon { background: linear-gradient(45deg, var(--secondary), #059669); }
+      .accent-icon { background: linear-gradient(45deg, var(--accent), #d97706); }
+
+      .card-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .card-subtitle {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+      }
+
+      /* Forms */
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .form-label {
+        font-weight: 500;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .form-input {
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        color: var(--text-primary);
+        font-size: 1rem;
+        transition: all 0.3s ease;
+      }
+
+      .form-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      }
+
+      .form-input::placeholder {
+        color: var(--text-muted);
+      }
+
+      /* Buttons */
+      .btn {
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        text-decoration: none;
+      }
+
+      .btn-primary {
+        background: linear-gradient(45deg, var(--primary), var(--primary-dark));
+        color: white;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+      }
+
+      .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .btn-large {
+        padding: 1.25rem 3rem;
+        font-size: 1.125rem;
+      }
+
+      /* Loading Animation */
+      .loading-spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top: 2px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      /* Progress Bar */
+      .progress-container {
+        width: 100%;
+        height: 4px;
+        background: var(--bg-tertiary);
+        border-radius: 2px;
+        overflow: hidden;
+        margin: 1rem 0;
+      }
+
+      .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        transition: width 0.3s ease;
+        border-radius: 2px;
+      }
+
+      /* Results Grid */
+      .results-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+      }
+
+      @media (max-width: 1024px) {
+        .results-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Stats Cards */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
+
+      .stat-card {
+        background: var(--glass);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: all 0.3s ease;
+      }
+
+      .stat-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--primary);
+      }
+
+      .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--primary);
+        margin-bottom: 0.5rem;
+      }
+
+      .stat-label {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      /* Table Styles */
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--glass);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+
+      .data-table th {
+        background: var(--bg-tertiary);
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .data-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border);
+        color: var(--text-primary);
+      }
+
+      .data-table tr:hover {
+        background: rgba(99, 102, 241, 0.1);
+      }
+
+      .data-table a {
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 500;
+      }
+
+      .data-table a:hover {
+        text-decoration: underline;
+      }
+
+      /* Rating Stars */
+      .rating {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+
+      .star {
+        color: var(--accent);
+      }
+
+      .rating-text {
+        margin-left: 0.5rem;
+        color: var(--text-muted);
+        font-size: 0.875rem;
+      }
+
+      /* Insights */
+      .insights-list {
+        list-style: none;
+        padding: 0;
+      }
+
+      .insights-list li {
+        padding: 1rem;
+        background: var(--glass);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+
+      .insight-icon {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 8px;
+        background: linear-gradient(45deg, var(--secondary), #059669);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.875rem;
+        flex-shrink: 0;
+      }
+
+      /* Chart Container */
+      .chart-container {
+        position: relative;
+        height: 400px;
+        background: var(--glass);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1rem;
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .container {
+          padding: 1rem;
+        }
+        
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+        
+        .header-content {
+          padding: 0 1rem;
+        }
+        
+        .stats-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      /* Hidden elements */
+      .hidden {
+        display: none !important;
+      }
+
+      /* Animations */
+      .fade-in {
+        animation: fadeIn 0.5s ease-in;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .slide-up {
+        animation: slideUp 0.6s ease-out;
+      }
+
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Animated Background -->
+    <div class="bg-animation">
+      <div class="floating-orb orb-1"></div>
+      <div class="floating-orb orb-2"></div>
+      <div class="floating-orb orb-3"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo">
+          <i class="fas fa-brain"></i>
+          <div>
+            <div>AI Supplier Intelligence</div>
+            <div style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted);">
+              Dropshipping Evaluation System
+            </div>
+          </div>
+        </div>
+        <div class="status-indicator">
+          <div class="status-dot"></div>
+          <span id="status-text">System Ready</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container">
+      <!-- Search Configuration -->
+      <div class="glass-card fade-in">
+        <div class="card-header">
+          <div class="card-icon primary-icon">
+            <i class="fas fa-search"></i>
+          </div>
+          <div>
+            <h2 class="card-title">Product Search Configuration</h2>
+            <p class="card-subtitle">Configure your supplier evaluation parameters</p>
+          </div>
+        </div>
+
+        <form id="scrape-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="query">
+                <i class="fas fa-tag"></i> Product Query
+              </label>
+              <input 
+                class="form-input" 
+                id="query" 
+                name="query" 
+                placeholder="wireless earbuds, phone cases, etc." 
+                required 
+              />
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label" for="max_suppliers">
+                <i class="fas fa-store"></i> Max Suppliers
+              </label>
+              <input 
+                class="form-input" 
+                id="max_suppliers" 
+                name="max_suppliers" 
+                type="number" 
+                min="1" 
+                max="20" 
+                value="5" 
+              />
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label" for="max_products_per_seller">
+                <i class="fas fa-boxes"></i> Products per Seller
+              </label>
+              <input 
+                class="form-input" 
+                id="max_products_per_seller" 
+                name="max_products_per_seller" 
+                type="number" 
+                min="1" 
+                max="10" 
+                value="3" 
+              />
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label" for="limit">
+                <i class="fas fa-list-ol"></i> Total Product Limit
+              </label>
+              <input 
+                class="form-input" 
+                id="limit" 
+                name="limit" 
+                type="number" 
+                min="1" 
+                max="50" 
+                value="20" 
+              />
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label" for="country">
+                <i class="fas fa-globe"></i> Target Country
+              </label>
+              <input 
+                class="form-input" 
+                id="country" 
+                name="country" 
+                placeholder="AU, US, UK, etc." 
+                value="AU" 
+              />
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label" for="scrapfly_key">
+                <i class="fas fa-key"></i> Scrapfly API Key
+              </label>
+              <input 
+                class="form-input" 
+                id="scrapfly_key" 
+                name="scrapfly_key" 
+                type="password"
+                placeholder="Enter your Scrapfly API key" 
+              />
+            </div>
+          </div>
+
+          <div style="margin-top: 2rem; display: flex; justify-content: center;">
+            <button id="run-btn" type="submit" class="btn btn-primary btn-large">
+              <i class="fas fa-rocket"></i>
+              <span id="btn-text">Analyze Suppliers</span>
+              <div id="loading-spinner" class="loading-spinner hidden"></div>
+            </button>
+          </div>
+
+          <div id="progress-container" class="progress-container hidden">
+            <div id="progress-bar" class="progress-bar"></div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Statistics Overview -->
+      <div id="stats-section" class="stats-grid hidden slide-up"></div>
+
+      <!-- Results Grid -->
+      <div id="results-section" class="results-grid hidden">
+        <!-- AI Insights -->
+        <div class="glass-card slide-up">
+          <div class="card-header">
+            <div class="card-icon secondary-icon">
+              <i class="fas fa-lightbulb"></i>
+            </div>
+            <div>
+              <h3 class="card-title">AI-Powered Insights</h3>
+              <p class="card-subtitle">Smart analysis from Gemini AI</p>
+            </div>
+          </div>
+          <ul id="insights" class="insights-list"></ul>
+        </div>
+
+        <!-- Performance Analytics -->
+        <div class="glass-card slide-up">
+          <div class="card-header">
+            <div class="card-icon accent-icon">
+              <i class="fas fa-chart-line"></i>
+            </div>
+            <div>
+              <h3 class="card-title">Performance Analytics</h3>
+              <p class="card-subtitle">Supplier performance visualization</p>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="performance-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Supplier Rankings -->
+      <div id="rankings-section" class="glass-card hidden slide-up">
+        <div class="card-header">
+          <div class="card-icon primary-icon">
+            <i class="fas fa-trophy"></i>
+          </div>
+          <div>
+            <h3 class="card-title">Top-Rated Products</h3>
+            <p class="card-subtitle">AI-ranked supplier recommendations</p>
+          </div>
+        </div>
+        
+        <div style="overflow-x: auto;">
+          <table id="products" class="data-table">
+            <thead>
+              <tr>
+                <th><i class="fas fa-trophy"></i> Rank</th>
+                <th><i class="fas fa-box"></i> Product</th>
+                <th><i class="fas fa-store"></i> Supplier</th>
+                <th><i class="fas fa-dollar-sign"></i> Price</th>
+                <th><i class="fas fa-star"></i> Rating</th>
+                <th><i class="fas fa-shopping-cart"></i> Orders</th>
+                <th><i class="fas fa-brain"></i> AI Score</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Raw Data (Collapsible) -->
+      <div id="raw-section" class="glass-card hidden slide-up">
+        <div class="card-header" style="cursor: pointer;" onclick="toggleRawData()">
+          <div class="card-icon" style="background: var(--glass);">
+            <i id="raw-toggle-icon" class="fas fa-chevron-down"></i>
+          </div>
+          <div>
+            <h3 class="card-title">Raw API Response</h3>
+            <p class="card-subtitle">Complete scraping results (click to expand)</p>
+          </div>
+        </div>
+        <div id="raw-content" class="hidden">
+          <pre id="raw-pre" style="background: var(--bg-primary); padding: 1.5rem; border-radius: 12px; overflow-x: auto; font-size: 0.875rem; line-height: 1.5;"></pre>
+        </div>
+      </div>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+  </html>
