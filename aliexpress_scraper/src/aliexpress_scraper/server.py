@@ -379,11 +379,18 @@ class CleanerAgent:
             )
 
         # Market analysis
-        price_ranges = [
-            float(p.get("price", "0").replace("$", "").replace(",", ""))
-            for p in products
-            if p.get("price")
-        ]
+        import re
+        price_ranges = []
+        for p in products:
+            price_str = p.get("price", "")
+            if price_str:
+                # Extract only numeric values (including decimal point)
+                match = re.search(r'[\d.]+', str(price_str))
+                if match:
+                    try:
+                        price_ranges.append(float(match.group()))
+                    except ValueError:
+                        pass
         avg_price = sum(price_ranges) / len(price_ranges) if price_ranges else 0
 
         market_analysis = {
