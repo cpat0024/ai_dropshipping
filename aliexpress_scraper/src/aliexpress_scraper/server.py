@@ -663,6 +663,7 @@ class Handler(BaseHTTPRequestHandler):
         # Run the detailed scraper
         async def _run_details():
             from .scrapfly_adapter import scrape_product_details_with_scrapfly
+
             return await scrape_product_details_with_scrapfly(product_url, scrapfly_key)
 
         try:
@@ -680,11 +681,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         # Return the detailed product information
-        payload = {
-            "ok": True,
-            "product_url": product_url,
-            "details": details
-        }
+        payload = {"ok": True, "product_url": product_url, "details": details}
         data = json.dumps(payload).encode("utf-8")
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/json")
