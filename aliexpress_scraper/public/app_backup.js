@@ -312,8 +312,7 @@ class SupplierAnalyzer {
           <td>
             <div class="rating">
               ${this.renderStars(rating)}
-              <span class="rating-text">(${rating > 0 ? rating.toFixed(1) : '0'})</span>
-              ${product.num_ratings > 0 ? `<div style="font-size: 0.8em; color: var(--text-secondary);">${this.formatNumber(product.num_ratings)} reviews</div>` : ''}
+              <span class="rating-text">(${rating})</span>
             </div>
           </td>
           <td>

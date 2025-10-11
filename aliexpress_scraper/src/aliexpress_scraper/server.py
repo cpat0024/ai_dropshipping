@@ -119,7 +119,7 @@ class CleanerAgent:
     falls back to returning a basic normalized summary derived locally.
     """
 
-    def __init__(self, model: str = "gemini-1.5-flash") -> None:
+    def __init__(self, model: str = "gemini-2.0-flash") -> None:
         self.model_name = model
         self.api_key = os.environ.get("GOOGLE_API_KEY")
         self._client: Optional[Any] = None
@@ -429,7 +429,7 @@ class OrchestratorAgent:
     If the Google SDK isn't available, returns the input params unchanged.
     """
 
-    def __init__(self, model: str = "gemini-1.5-flash") -> None:
+    def __init__(self, model: str = "gemini-2.0-flash") -> None:
         self.model_name = model
         self.api_key = os.environ.get("GOOGLE_API_KEY")
         self._client: Optional[Any] = None
@@ -522,7 +522,11 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(b"Error")
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path.split("?", 1)[0] != "/api/scrape":
+        path = self.path.split("?", 1)[0]
+        if path == "/api/product-details":
+            self._handle_product_details()
+            return
+        elif path != "/api/scrape":
             self.send_response(HTTPStatus.NOT_FOUND)
             self._set_cors()
             self.end_headers()
@@ -619,6 +623,67 @@ class Handler(BaseHTTPRequestHandler):
             "query": query,
             "cleaned": cleaned,
             "raw": result.to_dict(),
+        }
+        data = json.dumps(payload).encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/json")
+        self._set_cors()
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _handle_product_details(self) -> None:
+        """Handle detailed product scraping requests."""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = self.rfile.read(length) if length else b"{}"
+            body = json.loads(raw.decode("utf-8"))
+        except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+            self.send_response(HTTPStatus.BAD_REQUEST)
+            self._set_cors()
+            self.end_headers()
+            self.wfile.write(b"Invalid JSON")
+            return
+
+        product_url = str(body.get("product_url", "")).strip()
+        if not product_url:
+            self.send_response(HTTPStatus.BAD_REQUEST)
+            self._set_cors()
+            self.end_headers()
+            self.wfile.write(b"Missing product_url")
+            return
+
+        scrapfly_key = body.get("scrapfly_key") or os.environ.get("SCRAPFLY_KEY")
+        if not scrapfly_key:
+            self.send_response(HTTPStatus.BAD_REQUEST)
+            self._set_cors()
+            self.end_headers()
+            self.wfile.write(b"Missing Scrapfly API key")
+            return
+
+        # Run the detailed scraper
+        async def _run_details():
+            from .scrapfly_adapter import scrape_product_details_with_scrapfly
+            return await scrape_product_details_with_scrapfly(product_url, scrapfly_key)
+
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            details = loop.run_until_complete(_run_details())
+            loop.close()
+        except Exception as e:
+            LOGGER.error("Product details scraping failed: %s", e)
+            self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
+            self._set_cors()
+            self.end_headers()
+            error_data = json.dumps({"ok": False, "error": str(e)}).encode("utf-8")
+            self.wfile.write(error_data)
+            return
+
+        # Return the detailed product information
+        payload = {
+            "ok": True,
+            "product_url": product_url,
+            "details": details
         }
         data = json.dumps(payload).encode("utf-8")
         self.send_response(HTTPStatus.OK)

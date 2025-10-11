@@ -9,6 +9,7 @@ and simple seller info via the Scrapfly API. This is optional; install extras:
 
 and provide an API key via Config.scrapfly_key or SCRAPFLY_KEY env.
 """
+import asyncio
 import json
 import re
 from dataclasses import dataclass
@@ -75,24 +76,91 @@ async def search_products_sf(sf_cfg: ScrapflyConfig, query: str, limit: int = 20
             pid = it.get("productId")
             if not pid:
                 continue
+            
+            # Extract rating and review information from JSON
+            price_info = it.get("prices", {})
+            trade_info = it.get("trade", {})
+            
+            # Extract price
+            price = "0.00"
+            currency = "USD"
+            if isinstance(price_info, dict):
+                if "priceText" in price_info:
+                    price_text = price_info.get("priceText", "")
+                    if price_text:
+                        # Extract price and currency from priceText (e.g., "AU $1.54")
+                        import re
+                        price_match = re.search(r'(AU\s*)?\$?\s*(\d+\.?\d*)', price_text)
+                        if price_match:
+                            if price_match.group(1):  # AU prefix found
+                                currency = "AUD"
+                                price = price_match.group(2)
+                            else:
+                                price = price_match.group(2)
+                elif "originalPrice" in price_info:
+                    price = str(price_info.get("originalPrice", "0.00"))
+            
+            # Extract rating (star rating)
+            rating = 0.0
+            num_ratings = 0
+            
+            if isinstance(trade_info, dict):
+                # Look for rating in trade info
+                if "avgRating" in trade_info:
+                    rating = float(trade_info.get("avgRating", 0.0))
+                elif "starRating" in trade_info:
+                    rating = float(trade_info.get("starRating", 0.0))
+                
+                # Look for review count
+                if "reviewCount" in trade_info:
+                    num_ratings = int(trade_info.get("reviewCount", 0))
+                elif "ratingCount" in trade_info:
+                    num_ratings = int(trade_info.get("ratingCount", 0))
+                elif "tradeCount" in trade_info:
+                    # Sometimes tradeCount is used as proxy for reviews
+                    num_ratings = int(trade_info.get("tradeCount", 0))
+            
+            # Also check for orders/sold count
+            orders = 0
+            if isinstance(trade_info, dict):
+                if "recentOrderNum" in trade_info:
+                    orders = int(trade_info.get("recentOrderNum", 0))
+                elif "soldCount" in trade_info:
+                    orders = int(trade_info.get("soldCount", 0))
+            
             out.append(
                 {
                     "productId": str(pid),
                     "url": f"https://www.aliexpress.com/item/{pid}.html",
                     "title": it.get("title", {}).get("displayTitle"),
+                    "price": price,
+                    "currency": currency,
+                    "rating": rating,
+                    "num_ratings": num_ratings,
+                    "num_orders": orders,
                 }
             )
         return out
 
+    # Performance optimization: Fetch first page to determine if we need more
     first = await fetch_page(1)
     results = first[:]
-    # scrape next pages until limit is reached, up to 3 pages politely
-    page = 2
-    while len(results) < limit and page <= 3:
-        others = await fetch_page(page)
-        results.extend(others)
-        page += 1
-        await random_sleep(0.5, 1.0)
+    
+    if len(results) >= limit:
+        return results[:limit]
+    
+    # Fetch additional pages concurrently for better performance
+    remaining_pages = min(3, ((limit - len(results)) // 20) + 1)
+    if remaining_pages > 1:
+        page_tasks = [fetch_page(page) for page in range(2, remaining_pages + 2)]
+        page_results = await asyncio.gather(*page_tasks, return_exceptions=True)
+        
+        for page_result in page_results:
+            if isinstance(page_result, list):
+                results.extend(page_result)
+            if len(results) >= limit:
+                break
+    
     return results[:limit]
 
 
@@ -269,43 +337,80 @@ async def scrape_product_and_store_sf(sf_cfg: ScrapflyConfig, url: str) -> Tuple
         # === RATING ===
         rating = None
         import re
-        rating_patterns = [
-            r'(\d\.\d)\s*(?:star|rating)',
-            r'rating["\s:]*(\d\.\d)',
-            r'(\d\.\d)\s*out\s*of\s*5'
-        ]
-        page_text = sel.xpath('//text()').getall()
-        for text in page_text:
-            for pattern in rating_patterns:
-                match = re.search(pattern, text.lower())
-                if match:
-                    try:
-                        rating = float(match.group(1))
+        
+        # First try to extract from structured data in scripts
+        scripts = sel.xpath('//script[contains(.,"productReview") or contains(.,"avgRating") or contains(.,"starRating")]//text()').getall()
+        for script in scripts:
+            rating_matches = re.findall(r'"(?:avgRating|starRating|rating)":\s*(\d+\.?\d*)', script)
+            if rating_matches:
+                try:
+                    rating = float(rating_matches[0])
+                    if 0 <= rating <= 5:  # Valid rating range
                         break
-                    except ValueError:
-                        continue
-            if rating:
-                break
+                except ValueError:
+                    continue
+        
+        # Fallback to text-based patterns if structured data not found
+        if not rating:
+            rating_patterns = [
+                r'(\d\.\d)\s*(?:star|rating|out\s*of\s*5)',
+                r'rating["\s:]*(\d\.\d)',
+                r'(\d\.\d)\s*/\s*5',
+                r'(\d\.\d)\s*★',
+                r'★\s*(\d\.\d)',
+                r'(\d\.\d)\s*stars?',
+                r'evaluation["\s:]*(\d\.\d)'
+            ]
+            page_text = sel.xpath('//text()').getall()
+            for text in page_text:
+                for pattern in rating_patterns:
+                    match = re.search(pattern, text.lower())
+                    if match:
+                        try:
+                            rating = float(match.group(1))
+                            if 0 <= rating <= 5:  # Valid rating range
+                                break
+                        except ValueError:
+                            continue
+                if rating:
+                    break
         
         # === REVIEWS COUNT ===
         num_reviews = None
-        import re
-        review_patterns = [
-            r'(\d+(?:,\d+)*)\s*(?:review|rating)',
-            r'(\d+(?:,\d+)*)\s*people\s*rated',
-            r'based\s*on\s*(\d+(?:,\d+)*)'
-        ]
-        for text in page_text:
-            for pattern in review_patterns:
-                match = re.search(pattern, text.lower())
-                if match:
-                    try:
-                        num_reviews = int(match.group(1).replace(',', ''))
-                        break
-                    except ValueError:
-                        continue
-            if num_reviews:
-                break
+        
+        # First try to extract from structured data in scripts
+        for script in scripts:
+            review_matches = re.findall(r'"(?:reviewCount|ratingCount|totalReviews|evaluationCount)":\s*(\d+)', script)
+            if review_matches:
+                try:
+                    num_reviews = int(review_matches[0])
+                    break
+                except ValueError:
+                    continue
+        
+        # Fallback to text-based patterns
+        if not num_reviews:
+            review_patterns = [
+                r'(\d+(?:,\d+)*)\s*(?:review|rating|evaluation)s?',
+                r'(\d+(?:,\d+)*)\s*people\s*(?:rated|reviewed)',
+                r'based\s*on\s*(\d+(?:,\d+)*)',
+                r'(\d+(?:,\d+)*)\s*customer\s*(?:review|rating)',
+                r'(\d+(?:,\d+)*)\s*buyers?\s*(?:review|rating)',
+                r'(\d+(?:,\d+)*)\s*feedback',
+                r'(\d+(?:,\d+)*)\s*评价'  # Chinese for "reviews"
+            ]
+            page_text = sel.xpath('//text()').getall()
+            for text in page_text:
+                for pattern in review_patterns:
+                    match = re.search(pattern, text.lower())
+                    if match:
+                        try:
+                            num_reviews = int(match.group(1).replace(',', ''))
+                            break
+                        except ValueError:
+                            continue
+                if num_reviews:
+                    break
         
         # === ORDERS/SOLD COUNT ===
         num_orders = None
@@ -899,3 +1004,167 @@ async def run_with_scrapfly(query: str, *, max_suppliers: int, max_products_per_
     
     logger.info(f"Final result: {len(result.suppliers)} suppliers")
     return result
+
+
+async def scrape_product_details_with_scrapfly(product_url: str, scrapfly_key: str) -> Dict:
+    """Scrape comprehensive product details using Scrapfly."""
+    ScrapflyClient, ScrapeConfig, Selector = _require_scrapfly()
+    logger = get_logger()
+    
+    sf_client = ScrapflyClient(key=scrapfly_key)
+    
+    try:
+        # Configure scraping with JS rendering for dynamic content
+        config = ScrapeConfig(
+            url=product_url,
+            render_js=True,
+            wait_for_selector="body",
+            country="AU",
+            correlation_id=f"product-details-{hash(product_url)}",
+            cache=True,
+        )
+        
+        logger.info(f"Scraping product details: {product_url}")
+        response = await sf_client.async_scrape(config)
+        selector = Selector(response.content)
+        
+        # Extract comprehensive product information
+        details = {
+            "basic_info": {},
+            "ratings": {},
+            "seller": {},
+            "shipping": {},
+            "reviews": [],
+            "specifications": {},
+            "images": []
+        }
+        
+        # Basic product info
+        title = selector.css("h1::text, .product-title::text, .pdp-product-title::text").get() or "Unknown Product"
+        details["basic_info"]["title"] = title.strip()
+        
+        # Prices
+        price_selectors = [
+            ".price-current::text",
+            ".price-now::text", 
+            ".price-sale::text",
+            ".product-price-value::text",
+            "[data-role='price']::text"
+        ]
+        for price_sel in price_selectors:
+            price = selector.css(price_sel).get()
+            if price:
+                details["basic_info"]["price"] = price.strip()
+                break
+        
+        original_price = selector.css(".price-original::text, .price-del::text").get()
+        if original_price:
+            details["basic_info"]["original_price"] = original_price.strip()
+        
+        # Description
+        desc_selectors = [
+            ".product-description::text",
+            ".pdp-product-description::text",
+            ".product-overview::text"
+        ]
+        for desc_sel in desc_selectors:
+            description = selector.css(desc_sel).get()
+            if description:
+                details["basic_info"]["description"] = description.strip()[:500]
+                break
+        
+        # Brand and category
+        brand = selector.css(".brand-name::text, .product-brand::text").get()
+        if brand:
+            details["basic_info"]["brand"] = brand.strip()
+        
+        category = selector.css(".breadcrumb a::text").getall()
+        if category:
+            details["basic_info"]["category"] = " > ".join(category)
+        
+        # Ratings and reviews
+        rating = selector.css(".overview-rating-average::text, .product-rating::text").get()
+        if rating:
+            try:
+                details["ratings"]["rating"] = float(rating.strip())
+            except ValueError:
+                pass
+        
+        num_ratings = selector.css(".product-reviewer-reviews::text, .total-reviews::text").get()
+        if num_ratings:
+            details["ratings"]["num_ratings"] = int(''.join(filter(str.isdigit, num_ratings)))
+        
+        num_orders = selector.css(".product-reviewer-sold::text, .total-orders::text").get()
+        if num_orders:
+            details["ratings"]["num_orders"] = int(''.join(filter(str.isdigit, num_orders)))
+        
+        # Seller information
+        seller_name = selector.css(".seller-name::text, .store-name::text, .shop-name::text").get()
+        if seller_name:
+            details["seller"]["name"] = seller_name.strip()
+        
+        seller_rating = selector.css(".seller-rating::text, .store-rating::text").get()
+        if seller_rating:
+            try:
+                details["seller"]["rating"] = float(seller_rating.strip())
+            except ValueError:
+                pass
+        
+        # Shipping info
+        shipping_selectors = [
+            ".shipping-info::text",
+            ".logistics-info::text",
+            ".delivery-time::text"
+        ]
+        for ship_sel in shipping_selectors:
+            shipping = selector.css(ship_sel).get()
+            if shipping:
+                details["shipping"]["info"] = shipping.strip()
+                break
+        
+        # Product images
+        image_urls = selector.css("img::attr(src), img::attr(data-src)").getall()
+        valid_images = []
+        for img_url in image_urls:
+            if img_url and ("alicdn.com" in img_url or "aliexpress.com" in img_url):
+                if img_url.startswith("//"):
+                    img_url = "https:" + img_url
+                valid_images.append(img_url)
+        details["images"] = valid_images[:10]  # Limit to 10 images
+        
+        # Try to extract reviews
+        review_elements = selector.css(".review-item, .feedback-item")
+        for review_elem in review_elements[:5]:  # Get up to 5 reviews
+            review_text = review_elem.css(".review-content::text, .feedback-content::text").get()
+            review_rating_elem = review_elem.css(".review-rating, .star-rating")
+            review_author = review_elem.css(".reviewer-name::text, .review-author::text").get()
+            
+            if review_text:
+                review_rating = 5  # default
+                if review_rating_elem:
+                    # Try to extract star rating
+                    stars = len(review_rating_elem.css(".star-fill, .active-star").getall())
+                    if stars > 0:
+                        review_rating = stars
+                
+                details["reviews"].append({
+                    "author": review_author.strip() if review_author else "Anonymous",
+                    "rating": review_rating,
+                    "comment": review_text.strip()[:200]  # Limit comment length
+                })
+        
+        # Product specifications
+        spec_elements = selector.css(".product-prop, .sku-prop, .product-attr")
+        for spec_elem in spec_elements[:10]:  # Limit to 10 specs
+            spec_name = spec_elem.css(".prop-key::text, .attr-name::text").get()
+            spec_value = spec_elem.css(".prop-value::text, .attr-value::text").get()
+            
+            if spec_name and spec_value:
+                details["specifications"][spec_name.strip()] = spec_value.strip()
+        
+        logger.info(f"Successfully scraped product details: {title}")
+        return details
+        
+    except Exception as e:
+        logger.error(f"Error scraping product details: {e}")
+        return {"error": f"Failed to scrape product details: {str(e)}"}
