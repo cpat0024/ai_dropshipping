@@ -75,11 +75,15 @@ async def search_products_sf(sf_cfg: ScrapflyConfig, query: str, limit: int = 20
             pid = it.get("productId")
             if not pid:
                 continue
+            # Extract rating from search results
+            rating = it.get("evaluation", {}).get("starRating")
+            
             out.append(
                 {
                     "productId": str(pid),
                     "url": f"https://www.aliexpress.com/item/{pid}.html",
                     "title": it.get("title", {}).get("displayTitle"),
+                    "rating": rating,
                 }
             )
         return out
@@ -96,7 +100,7 @@ async def search_products_sf(sf_cfg: ScrapflyConfig, query: str, limit: int = 20
     return results[:limit]
 
 
-async def scrape_product_and_store_sf(sf_cfg: ScrapflyConfig, url: str) -> Tuple[Optional[Product], Optional[Tuple[str, str]]]:
+async def scrape_product_and_store_sf(sf_cfg: ScrapflyConfig, url: str, preview_data: Optional[Dict] = None) -> Tuple[Optional[Product], Optional[Tuple[str, str]]]:
     """Scrape both product info and store info from a product page.
     
     Returns (Product, (store_name, store_url)) or (None, None) if failed.
@@ -134,7 +138,13 @@ async def scrape_product_and_store_sf(sf_cfg: ScrapflyConfig, url: str) -> Tuple
         rating_text = sel.xpath("//div[contains(@class,'rating--wrap')]/div/text()|//span[contains(@class,'overview-rating-average')]/text()").get()
         num_ratings_text = sel.xpath("//a[contains(@class,'reviewer--reviews')]/text()|//span[@id='j-cnt-review']/text()").get()
 
-        def to_float(s: Optional[str]) -> Optional[float]:
+(        # Use preview_data for rating if available
+        if preview_data and preview_data\.get\("rating"\) is not None:
+            rating_value = preview_data\.get\("rating"\)
+        else:
+            rating_value = None
+        
+)        def to_float(s: Optional[str]) -> Optional[float]:
             if not s:
                 return None
             s = s.replace(",", ".")
@@ -156,7 +166,7 @@ async def scrape_product_and_store_sf(sf_cfg: ScrapflyConfig, url: str) -> Tuple
             product_id=pid,
             price=price_text,
             currency=currency,
-            rating=to_float(rating_text),
+            rating=rating_value if rating_value is not None else to_float(rating_text),
             num_ratings=to_int(num_ratings_text),
             image_urls=[i for i in imgs if i and i.startswith("http")][:20],
         )
@@ -260,7 +270,7 @@ async def run_with_scrapfly(query: str, *, max_suppliers: int, max_products_per_
             
         try:
             logger.info(f"Scraping product: {preview['url']}")
-            product, store_info = await scrape_product_and_store_sf(sf_cfg, preview["url"])
+            product, store_info = await scrape_product_and_store_sf(sf_cfg, preview["url"], preview_data=preview)
             
             if product and store_info:
                 store_name, store_url = store_info

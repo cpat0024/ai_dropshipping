@@ -335,18 +335,78 @@ class SupplierAnalyzer {
   }
 
   calculateAIScore(product) {
-    // Simple AI scoring algorithm based on rating, orders, and price
+    // Enhanced AI scoring algorithm: 
+    // Score = 0.4×(Rating) + 0.3×(log-Sales) + 0.2×(Inventory/Price) + 0.1×(AI-Insight)
+    
     const rating = product.rating || 0;
     const orders = product.num_orders || 0;
+    const numRatings = product.num_ratings || 0;
     const hasPrice = product.price && product.price !== 'N/A';
+    const priceValue = hasPrice ? parseFloat(product.price.replace(/[^0-9.]/g, '')) : 0;
     
-    let score = 0;
-    score += (rating / 5) * 40; // Rating contributes 40%
-    score += Math.min((orders / 1000), 1) * 30; // Orders contribute 30%
-    score += hasPrice ? 20 : 0; // Price availability contributes 20%
-    score += Math.random() * 10; // Random factor for AI "insight" 10%
+    // 1. Rating Score (40% weight) - normalized to 0-100
+    const ratingScore = (rating / 5) * 100;
     
-    return Math.round(Math.min(score, 100));
+    // 2. Logarithmic Sales Volume Score (30% weight)
+    // Using log10 to handle wide range of order volumes
+    // Scale: 1 order = ~0, 10 orders = ~33, 100 orders = ~66, 1000+ orders = ~100
+    const salesScore = orders > 0 
+      ? Math.min((Math.log10(orders + 1) / Math.log10(10000)) * 100, 100)
+      : 0;
+    
+    // 3. Inventory/Price Availability Score (20% weight)
+    let inventoryScore = 0;
+    if (hasPrice && priceValue > 0) {
+      inventoryScore += 50; // Has valid price
+      
+      // Price competitiveness (lower is better, but not too low)
+      if (priceValue >= 1 && priceValue <= 50) {
+        inventoryScore += 30; // Good price range
+      } else if (priceValue > 50 && priceValue <= 100) {
+        inventoryScore += 20; // Acceptable range
+      } else if (priceValue > 100) {
+        inventoryScore += 10; // High price
+      }
+      
+      // Stock indicators (if orders exist, stock is likely available)
+      if (orders > 100) {
+        inventoryScore += 20; // High availability indicator
+      } else if (orders > 0) {
+        inventoryScore += 10; // Some availability
+      }
+    }
+    inventoryScore = Math.min(inventoryScore, 100);
+    
+    // 4. AI-Insight Factor (10% weight)
+    // Combines multiple quality signals
+    let aiInsight = 50; // Baseline
+    
+    // Review credibility (more reviews = more reliable rating)
+    if (numRatings > 1000) {
+      aiInsight += 30;
+    } else if (numRatings > 100) {
+      aiInsight += 20;
+    } else if (numRatings > 10) {
+      aiInsight += 10;
+    }
+    
+    // Rating-to-orders ratio (good ratings + high orders = quality product)
+    if (rating >= 4.5 && orders > 500) {
+      aiInsight += 20; // Premium product indicator
+    } else if (rating >= 4.0 && orders > 100) {
+      aiInsight += 10; // Good product
+    }
+    
+    aiInsight = Math.min(aiInsight, 100);
+    
+    // Calculate weighted final score
+    const finalScore = 
+      (ratingScore * 0.4) +
+      (salesScore * 0.3) +
+      (inventoryScore * 0.2) +
+      (aiInsight * 0.1);
+    
+    return Math.round(Math.min(finalScore, 100));
   }
 
   renderStars(rating) {

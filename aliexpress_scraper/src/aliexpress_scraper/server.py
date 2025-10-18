@@ -151,6 +151,11 @@ class CleanerAgent:
                     "CRITICAL: Generate a comprehensive JSON response with: "
                     "- 'top_products': Array of up to 10 best products ranked by AI scoring algorithm. "
                     "  IMPORTANT: Each product MUST include ALL original fields: product_title, product_url, product_id, seller_name, price, currency, rating, num_ratings, num_orders, and add ai_score (0-100). "
+                    "  AI SCORING FORMULA: ai_score = 0.4×(rating/5×100) + 0.3×(log10(orders+1)/log10(10000)×100) + 0.2×(inventory_price_score) + 0.1×(insight_score) "
+                    "  - Rating component (40%): Normalize rating to 0-100 scale "
+                    "  - Sales volume component (30%): Use logarithmic scaling for order volumes "
+                    "  - Inventory/Price component (20%): Consider price availability, competitiveness, and stock indicators "
+                    "  - AI-Insight component (10%): Quality signals from review count, rating-to-orders ratio, and market positioning "
                     "- 'top_sellers': Array of up to 5 best suppliers with ALL original seller fields preserved "
                     "- 'insights': Array of 5-8 actionable insights focusing on dropshipping strategy, market opportunities, pricing analysis, and risk assessment "
                     "- 'market_analysis': Object with competitive landscape, pricing trends, and demand indicators "
@@ -288,10 +293,66 @@ class CleanerAgent:
             for p in s.products:
                 orders = p.num_orders or 0
                 rating = p.rating or 0
+                num_ratings = p.num_ratings or 0
+                price = p.price or ""
                 total_orders += orders
                 if rating > 0:
                     total_ratings += rating
                     rating_count += 1
+
+                # Calculate AI score using improved formula:
+                # Score = 0.4×(Rating) + 0.3×(log-Sales) + 0.2×(Inventory/Price) + 0.1×(AI-Insight)
+                
+                # 1. Rating Score (40% weight)
+                rating_score = (rating / 5) * 100
+                
+                # 2. Logarithmic Sales Volume Score (30% weight)
+                import math
+                sales_score = (math.log10(orders + 1) / math.log10(10000)) * 100 if orders > 0 else 0
+                sales_score = min(sales_score, 100)
+                
+                # 3. Inventory/Price Availability Score (20% weight)
+                inventory_score = 0
+                if price and price != "N/A":
+                    inventory_score += 50  # Has valid price
+                    try:
+                        price_value = float(''.join(c for c in str(price) if c.isdigit() or c == '.'))
+                        if 1 <= price_value <= 50:
+                            inventory_score += 30
+                        elif 50 < price_value <= 100:
+                            inventory_score += 20
+                        else:
+                            inventory_score += 10
+                    except (ValueError, TypeError):
+                        pass
+                    if orders > 100:
+                        inventory_score += 20
+                    elif orders > 0:
+                        inventory_score += 10
+                inventory_score = min(inventory_score, 100)
+                
+                # 4. AI-Insight Factor (10% weight)
+                ai_insight = 50  # Baseline
+                if num_ratings > 1000:
+                    ai_insight += 30
+                elif num_ratings > 100:
+                    ai_insight += 20
+                elif num_ratings > 10:
+                    ai_insight += 10
+                    
+                if rating >= 4.5 and orders > 500:
+                    ai_insight += 20
+                elif rating >= 4.0 and orders > 100:
+                    ai_insight += 10
+                ai_insight = min(ai_insight, 100)
+                
+                # Calculate weighted final score
+                final_score = (
+                    rating_score * 0.4 +
+                    sales_score * 0.3 +
+                    inventory_score * 0.2 +
+                    ai_insight * 0.1
+                )
 
                 products.append(
                     {
@@ -300,10 +361,9 @@ class CleanerAgent:
                         "seller_name": s.seller_name,
                         "price": p.price,
                         "rating": rating,
+                        "num_ratings": num_ratings,
                         "num_orders": orders,
-                        "ai_score": min(
-                            100, int((rating / 5 * 50) + (min(orders / 1000, 1) * 50))
-                        ),
+                        "ai_score": min(100, int(round(final_score))),
                     }
                 )
 
