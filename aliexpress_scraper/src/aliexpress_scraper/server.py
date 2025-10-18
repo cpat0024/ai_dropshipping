@@ -302,21 +302,28 @@ class CleanerAgent:
 
                 # Calculate AI score using improved formula:
                 # Score = 0.4×(Rating) + 0.3×(log-Sales) + 0.2×(Inventory/Price) + 0.1×(AI-Insight)
-                
+
                 # 1. Rating Score (40% weight)
                 rating_score = (rating / 5) * 100
-                
+
                 # 2. Logarithmic Sales Volume Score (30% weight)
                 import math
-                sales_score = (math.log10(orders + 1) / math.log10(10000)) * 100 if orders > 0 else 0
+
+                sales_score = (
+                    (math.log10(orders + 1) / math.log10(10000)) * 100
+                    if orders > 0
+                    else 0
+                )
                 sales_score = min(sales_score, 100)
-                
+
                 # 3. Inventory/Price Availability Score (20% weight)
                 inventory_score = 0
                 if price and price != "N/A":
                     inventory_score += 50  # Has valid price
                     try:
-                        price_value = float(''.join(c for c in str(price) if c.isdigit() or c == '.'))
+                        price_value = float(
+                            "".join(c for c in str(price) if c.isdigit() or c == ".")
+                        )
                         if 1 <= price_value <= 50:
                             inventory_score += 30
                         elif 50 < price_value <= 100:
@@ -330,7 +337,7 @@ class CleanerAgent:
                     elif orders > 0:
                         inventory_score += 10
                 inventory_score = min(inventory_score, 100)
-                
+
                 # 4. AI-Insight Factor (10% weight)
                 ai_insight = 50  # Baseline
                 if num_ratings > 1000:
@@ -339,19 +346,19 @@ class CleanerAgent:
                     ai_insight += 20
                 elif num_ratings > 10:
                     ai_insight += 10
-                    
+
                 if rating >= 4.5 and orders > 500:
                     ai_insight += 20
                 elif rating >= 4.0 and orders > 100:
                     ai_insight += 10
                 ai_insight = min(ai_insight, 100)
-                
+
                 # Calculate weighted final score
                 final_score = (
-                    rating_score * 0.4 +
-                    sales_score * 0.3 +
-                    inventory_score * 0.2 +
-                    ai_insight * 0.1
+                    rating_score * 0.4
+                    + sales_score * 0.3
+                    + inventory_score * 0.2
+                    + ai_insight * 0.1
                 )
 
                 products.append(

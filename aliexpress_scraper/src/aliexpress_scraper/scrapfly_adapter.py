@@ -111,7 +111,7 @@ async def search_products_sf(
             rating = 0.0
             num_ratings = 0
             orders = 0
-            
+
             # Check evaluation data (common in AliExpress JSON)
             evaluation = it.get("evaluation", {})
             if isinstance(evaluation, dict):
@@ -141,7 +141,12 @@ async def search_products_sf(
 
                 # Look for review count
                 if num_ratings == 0:
-                    for key in ["reviewCount", "ratingCount", "evaluationCount", "totalEvaluation"]:
+                    for key in [
+                        "reviewCount",
+                        "ratingCount",
+                        "evaluationCount",
+                        "totalEvaluation",
+                    ]:
                         if key in trade_info:
                             try:
                                 num_ratings = int(trade_info.get(key, 0))
@@ -383,7 +388,7 @@ async def scrape_product_and_store_sf(
         # === RATING ===
         rating = None
         import re
-        
+
         # Get all page text once for reuse across extraction strategies
         page_text = sel.xpath("//text()").getall()
 
@@ -393,7 +398,7 @@ async def scrape_product_and_store_sf(
         for span_text in all_spans:
             span_text = span_text.strip()
             # Check if it's a simple decimal number (e.g., "4.8", "3.5")
-            if re.match(r'^\d\.\d+$', span_text):
+            if re.match(r"^\d\.\d+$", span_text):
                 try:
                     test_rating = float(span_text)
                     if 0 <= test_rating <= 5:  # Valid rating range
@@ -410,13 +415,13 @@ async def scrape_product_and_store_sf(
                 "//*[contains(@class, 'evaluation')]//span[contains(text(), '.')]//text()",
                 "//div[contains(@class, 'product-reviewer')]//span[contains(text(), '.')]//text()",
             ]
-            
+
             for selector in rating_selectors:
                 rating_candidates = sel.xpath(selector).getall()
                 for candidate in rating_candidates:
                     candidate = candidate.strip()
                     # Look for a decimal number between 0 and 5
-                    if re.match(r'^\d\.\d+$', candidate):
+                    if re.match(r"^\d\.\d+$", candidate):
                         try:
                             test_rating = float(candidate)
                             if 0 <= test_rating <= 5:
@@ -434,7 +439,8 @@ async def scrape_product_and_store_sf(
             ).getall()
             for script in scripts:
                 rating_matches = re.findall(
-                    r'"(?:avgRating|starRating|rating|evaluation)":\s*"?(\d+\.?\d*)"?', script
+                    r'"(?:avgRating|starRating|rating|evaluation)":\s*"?(\d+\.?\d*)"?',
+                    script,
                 )
                 if rating_matches:
                     try:
@@ -470,7 +476,7 @@ async def scrape_product_and_store_sf(
 
         # === REVIEWS COUNT ===
         num_reviews = None
-        
+
         # Strategy 1: Look for review count in span elements near ratings
         review_selectors = [
             "//span[@data-spm-anchor-id]//ancestor::*[contains(@class, 'review') or contains(@class, 'rating')]//span[contains(text(), 'review') or contains(text(), 'Review')]//text()",
@@ -478,17 +484,17 @@ async def scrape_product_and_store_sf(
             "//span[contains(text(), 'review') or contains(text(), 'Review') or contains(text(), 'rating')]//text()",
             "//*[contains(text(), 'Reviews') or contains(text(), 'reviews') or contains(text(), 'Ratings')]//text()",
         ]
-        
+
         for selector in review_selectors:
             review_candidates = sel.xpath(selector).getall()
             for candidate in review_candidates:
                 candidate = candidate.strip()
                 # Look for numbers potentially with K suffix
-                num_match = re.search(r'(\d+(?:,\d+)*(?:\.\d+)?)\s*[Kk]?', candidate)
+                num_match = re.search(r"(\d+(?:,\d+)*(?:\.\d+)?)\s*[Kk]?", candidate)
                 if num_match:
                     try:
-                        num_str = num_match.group(1).replace(',', '')
-                        if 'k' in candidate.lower() or 'K' in candidate:
+                        num_str = num_match.group(1).replace(",", "")
+                        if "k" in candidate.lower() or "K" in candidate:
                             num_reviews = int(float(num_str) * 1000)
                         else:
                             num_reviews = int(float(num_str))
@@ -501,7 +507,7 @@ async def scrape_product_and_store_sf(
 
         # Strategy 2: Extract from structured data in scripts
         if not num_reviews:
-            scripts = sel.xpath('//script//text()').getall()
+            scripts = sel.xpath("//script//text()").getall()
             for script in scripts:
                 review_matches = re.findall(
                     r'"(?:reviewCount|ratingCount|totalReviews|evaluationCount|reviewNum)":\s*"?(\d+)"?',
@@ -658,7 +664,7 @@ async def scrape_product_and_store_sf(
         if store_url:
             # Strategy 1: Look for specific store name element (most reliable for AliExpress)
             store_name_candidates = []
-            
+
             # Target the specific store name span class used by AliExpress
             specific_store_name = sel.xpath(
                 "//span[contains(@class, 'storeName') or contains(@class, 'store-name') or contains(@class, 'store-detail--storeName')]//text()"
@@ -670,23 +676,38 @@ async def scrape_product_and_store_sf(
                 link_text_candidates = sel.xpath(
                     "//a[contains(@href, '/store/')]//text()"
                 ).getall()
-                
+
                 # Filter out common non-store text patterns
                 for candidate in link_text_candidates:
                     candidate = candidate.strip()
                     # Skip if it looks like a number, measurement, or common action word
                     if (
-                        len(candidate) > 3 
+                        len(candidate) > 3
                         and len(candidate) < 80
-                        and not re.match(r'^\d+[\d,\s\+]*(?:sold|k|K)?$', candidate)  # Skip "50,000+ sold" etc
-                        and not candidate.replace(',', '').replace('+', '').isdigit()
-                        and '%' not in candidate
+                        and not re.match(
+                            r"^\d+[\d,\s\+]*(?:sold|k|K)?$", candidate
+                        )  # Skip "50,000+ sold" etc
+                        and not candidate.replace(",", "").replace("+", "").isdigit()
+                        and "%" not in candidate
                         and not any(
                             word in candidate.lower()
                             for word in [
-                                "visit", "view", "see all", "more items", "google", "play",
-                                "app", "download", "install", "mobile", "click", "link",
-                                "sold", "positive", "feedback", "rating"
+                                "visit",
+                                "view",
+                                "see all",
+                                "more items",
+                                "google",
+                                "play",
+                                "app",
+                                "download",
+                                "install",
+                                "mobile",
+                                "click",
+                                "link",
+                                "sold",
+                                "positive",
+                                "feedback",
+                                "rating",
                             ]
                         )
                     ):
@@ -981,7 +1002,7 @@ async def scrape_seller_sf(
         rating = None
         followers = None
         location = None
-        
+
         import re
 
         # Look for seller/store rating (more targeted approach)
@@ -991,13 +1012,13 @@ async def scrape_seller_sf(
             "//*[contains(@class, 'positive-feedback')]//text()",
             "//div[contains(@class, 'seller-info')]//span[contains(text(), '%')]//text()",
         ]
-        
+
         for selector in store_rating_selectors:
             rating_texts = sel.xpath(selector).getall()
             for text in rating_texts:
                 text = text.strip()
                 # Look for percentage (e.g., "98.5%") - common for seller ratings
-                percent_match = re.search(r'(\d+(?:\.\d+)?)\s*%', text)
+                percent_match = re.search(r"(\d+(?:\.\d+)?)\s*%", text)
                 if percent_match:
                     try:
                         rating_val = float(percent_match.group(1))
@@ -1006,9 +1027,9 @@ async def scrape_seller_sf(
                             break
                     except ValueError:
                         continue
-                
+
                 # Look for star rating (e.g., "4.8" or "4.8/5")
-                star_match = re.search(r'(\d\.\d+)(?:\s*/\s*5)?', text)
+                star_match = re.search(r"(\d\.\d+)(?:\s*/\s*5)?", text)
                 if star_match and not percent_match:  # Don't double-match
                     try:
                         rating_val = float(star_match.group(1))
@@ -1019,7 +1040,7 @@ async def scrape_seller_sf(
                         continue
             if rating:
                 break
-        
+
         # Strategy 2: Look in scripts for structured data
         if not rating:
             scripts = sel.xpath("//script//text()").getall()
